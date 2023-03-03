@@ -1,0 +1,120 @@
+---
+title: "Machine Learning"
+author: "Tao Izzo Elvira"
+date: "2/6/2021"
+output: html_document
+---
+# CASO PRACTICO TAXI FLOTA AYTO. MADRID
+
+# Instalacon de librerias a usarse o llamarlas
+es preferible tener el listado de las libreiras desde un inicio, de esta forma sabremos que ya estan ahi para usarse y solo llmaremos a las funciones de dichas librerias
+```{r}
+#install.packages("caTools")
+#install.packages("e1071")
+#install.packages("ROCR")
+#install.packages("rpart")
+#install.packages("rpart.plot")
+#install.packages("randomForest")
+#install.packages("party")
+#install.packages("ggplot2")
+#install.packages("lubridate")
+library(lubridate) #Libreria que servira para transformar la fecha de string a mueric
+library(caTools)#Libreira para partir conjunto de datos
+library(e1071)#Libreria de Svm y Bayesiano
+library(ROCR) # Libreria representacion de ROC
+library(rpart)#Libreira para el arbol de decisiones
+library(rpart.plot)#Libreria para visualizar el arbol de decisiones 
+library(randomForest)#Libreria modelo de arbol aleatorio
+library(party)#Libreria para visualizar el arbol
+library(ggplot2)#Libreria de graficas
+```
+## Planteamiento del problema
+https://drive.google.com/file/d/1HhJlW5kbkdLCc7Pv8IAolEGH93JOi6bO/view?usp=sharing
+
+![Imagen](https://drive.google.com/file/d/1HhJlW5kbkdLCc7Pv8IAolEGH93JOi6bO/view?usp=sharing){width='100px' height='200px'}
+
+## Limpieza de menoria y carga de datos 
+En la siguiente celda se hara una limpieza de la memoria por funcion y se cargaran los datos de un csv por medio de un link, donde sera necesario especificar como estan los datos separados.
+
+Nota: La limpieza de los datos y consola se puede hacer manual usando R y en mi opinion es mas recomendable para estar seguro de estar trabajando con los datos del archivo actual asi como ver el historial de los cambios y ejecucion.   
+```{r}
+rm(list = ls()) # Limpiar la memoria
+# CARGAR DATOS
+#------------------------------------------------------------------------------
+# Datos de la Flota de Taxis de la ciudad de Madrid.
+taxiFlota<-read.csv("http://www.diegocalvo.es/wp-content/uploads/2019/11/taxiFlota.csv",sep = ";",header=TRUE)
+```
+En R una vez que se carguen nuestros datos, en este caso el archivo csv el cual se ha guardado en la variable taxiFlota, aparecera en nuestro enviroment donde, en primera instancia s epodra observar con cuantos datos estaremos trabajando y en ceuntas variables/columnas estan distribuidas.
+
+## Estudio basico de datos
+A continuacion se hara un alanalizis de niestrso datos un poco mas profunda, viendo el tipo de datos, cunatas variables hay, si hay valores nulos entre otros
+```{r}
+View(taxiFlota) #Se visualiza el dataframe completo, esto como primera instancia nos permite observar los datos de manera general, sin embargo no es recomendable revisar uno por uno, para ello hay funciones especificas que ahorran tiempo 
+dim(taxiFlota) # Da la dimension de variables y datos u observaciones
+head(taxiFlota) # Imprime la informacion de las columnas, el tipo que son asi como las primeras seis, esto sirve para tener en cuenta con que tipo de variables se van a atrabajar 
+summary(taxiFlota) # La funcion summary da diferentes metricas e informacion de las diferentes avriables, esto sirve en las numericas para saber la media, mediana y los cuantiles  
+colSums(is.na(taxiFlota)) # Se sumaran los valores en las variables donde estos sean nulos, para contemplar si se debe de hacer una limpieza o se podra trabajar con la data tal y como esta. No obstante los valores na no son los unicos que se deben tratar, si no tambien aquellos donde los avlores etsen en blanco por lo cual s etiene que hacer una segunda limpieza
+taxiFlota[taxiFlota==""]=NA #Todos los valores con caracteres nulos/vacios ahora seran na para su tratamiento
+colSums(is.na(taxiFlota)) #Se hace una suma otra vez de todas aquellas columnas donde los valores ser de tipo na, debido a que la cantidad es abismal se hara una depuracion de todas aquellas filas donde el tipo se NA
+taxiFlotaclean=na.omit(taxiFlota) #Se crea una nueva variable donde se alojaran los datos que no contengan valores na, es decir se eliminnan las filas con valores na
+dim(taxiFlotaclean) # Al observar la dimension otra vez se puede observar que los valores han disminuido mas de la mitad al eliminar estos valores faltantes o nulus, por lo cual el tratamiento de los datos esta listo para llevar un mejor modelo, aunque cabe restaltar que aun se podrian examinar y eliminar los outlieres en caso de ser necesario
+View(taxiFlotaclean)
+```
+
+Una vez teniendo los datos listos se creara una nueva data en la cual solo se contemplaran las variables que indica el enunciado 
+```{r}
+colnames(taxiFlotaclean) #Se muestra el nombre de todas las columnas para añadir el nombre tal cual aparece aqui y no tener algun error
+subdata= subset(taxiFlotaclean,select = c("Clasificación.medioambiental","Combustible","Fecha.Matriculación"))#se crea el subdata con las 3 variables solo a considerar para el entrenamiento
+subdata$Fecha.Matriculación=as.Date(subdata$Fecha.Matriculación,format="%d/%m/%Y","%Y") # Se convierte la columna a fecha
+subdata$Fecha.Matriculación=year(subdata$Fecha.Matriculación)#se extrae solo el año como numerico
+class(subdata$Fecha.Matriculación) # se ve en que tipo esta el dato
+View(subdata) #se visualiza el DatFrame
+```
+
+## Modelos de Machine Learning
+SVM (Support Vector Machine), 
+Árboles de Decisión, 
+Bosques aleatorios (Random Forest) 
+y Cuantificador Bayesiano Ingenuo.
+```{r}
+#head(subdata,7)#se visualizan los datos con los cuales se trabajaran en el modelo
+#table(subdata$Combustible)#Se visualiza las categorias y su valor del comustible 
+#subdata$Combustible=factor(subdata$Combustible,levels = c("DIESEL","GASOLINA-ELECTRICIDAD","GASOLINA TRANSFORMADO GLP"),labels = c("DIESEL","GASOLINA-ELECTRICIDAD","GASOLINA TRANSFORMADO GLP")) #Se convierten en valores categoricas los valores del combustible
+#set.seed(1234)#se fija la semilla
+#split=sample.split(subdata$Combustible,SplitRatio = 0.75)# Se parte el conjunto en dos
+#training=subset(subdata,split==TRUE) #Entrenaimiento con conjuntos true
+#test= subset(subdata,split==FALSE) #Teste con conjuntos False
+#summary(training) #vemos un resumen de nuestro datos
+#Exploaracion de los datos del test para saber con cuantas variables se trabaja en cada uno
+#nrow(training)
+#nrow(test)
+#attach(training)#Se usan las variables de forma directa sin tener que identificar los conjuntos
+
+#modelsvm
+#modelsvm=svm(Clasificación.medioambiental~.,data = training,type="C-classification",kernel="radial")
+#summary(modelsvm)
+
+#Modelo arbo de decision
+#modelrpart= rpart(Clasificación.medioambiental~.,data=training)#Modelo de arbol de decisiones
+#summary(modelrpart)#muestra el resumen del modelo
+#rpart.plot
+
+#Prediccion del modelo
+#predictionrpart=predict(modelrpart, nwdt=test,type="class")#realiza la prediccion con los datos
+#predictionrpart #imprime las predicciones de los test por el identificador del elemento
+
+#Evaluacion del modelo
+#Matriz de confusion
+#confusionmatrix=table(Clasificación.medioambiental~.,predictionrpart)
+#Me aparece un error que la longitud debe ser igual
+
+#Curva Roc
+#rco=prediction(as.numeric(predictionrpart),as.numeric((test$Clasificación.medioambiental)))
+
+#Model RandomForest
+#modelrf=randomForest(Clasificación.medioambiental~.,data=training,ntree=3)
+
+#predicion de ramdomforest
+#predictinrf=predict(modelrf,nwdt=test)
+```
+Intente hacer los modelos sin embargo me surgieron muchas dudas a la hora de hacer, experimentar y probar, lo errores fueron similares a los publicados en los foros pero no encontre respuesta, con el debdio teimpo quisiera intentar volver a hacer la practica para analizar rigurosamente los modelos de clasificacion y encontrar el error al elaborarlos.
